@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Result Checker</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f4f4f4;
+    }
+
+    h1 {
+        text-align: center;
+        color: #333;
+    }
+
+    .container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    input[type=file] {
+        margin-bottom: 15px;
+    }
+
+    button {
+        padding: 10px 15px;
+        border: none;
+        background: #007bff;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-right: 10px;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+    }
+
+    table, th, td {
+        border: 1px solid #ccc;
+    }
+
+    th {
+        background: #007bff;
+        color: white;
+        padding: 10px;
+    }
+
+    td {
+        padding: 8px;
+        text-align: center;
+    }
+
+    .pass {
+        color: green;
+        font-weight: bold;
+    }
+
+    .fail {
+        color: red;
+        font-weight: bold;
+    }
+
+    .summary {
+        margin-top: 20px;
+        font-size: 18px;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Student Result Checker</h1>
+
+    <p><strong>Excel Format Required:</strong></p>
+    <p>Name | English | Dzongkha | Math | Science</p>
+
+    <input type="file" id="excelFile" accept=".xlsx, .xls">
+
+    <button onclick="processExcel()">Process Result</button>
+    <button onclick="downloadResult()">Download Result</button>
+
+    <div class="summary" id="classMean"></div>
+
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>English</th>
+                <th>Dzongkha</th>
+                <th>Math</th>
+                <th>Science</th>
+                <th>Total</th>
+                <th>Average</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+let processedData = [];
+
+function processExcel() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('Please upload an Excel file.');
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        processedData = [];
+
+        jsonData.forEach(student => {
+            const english = Number(student.English || 0);
+            const dzongkha = Number(student.Dzongkha || 0);
+            const math = Number(student.Math || 0);
+            const science = Number(student.Science || 0);
+
+            const total = english + dzongkha + math + science;
+            const average = total / 4;
+
+            let status = 'Pass';
+
+            if (
+                english < 40 ||
+                dzongkha < 40 ||
+                math < 40 ||
+                science < 40
+            ) {
+                status = 'Fail';
+            }
+
+            processedData.push({
+                Rank: 0,
+                Name: student.Name,
+                English: english,
+                Dzongkha: dzongkha,
+                Math: math,
+                Science: science,
+                Total: total,
+                Average: average.toFixed(2),
+                Status: status
+            });
+        });
+
+        processedData.sort((a, b) => b.Total - a.Total);
+
+        processedData.forEach((student, index) => {
+            student.Rank = index + 1;
+        });
+
+        displayResults();
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+function displayResults() {
+    const tbody = document.querySelector('#resultTable tbody');
+    tbody.innerHTML = '';
+
+    let classTotal = 0;
+
+    processedData.forEach(student => {
+        classTotal += Number(student.Average);
+
+        const row = `
+            <tr>
+                <td>${student.Rank}</td>
+                <td>${student.Name}</td>
+                <td>${student.English}</td>
+                <td>${student.Dzongkha}</td>
+                <td>${student.Math}</td>
+                <td>${student.Science}</td>
+                <td>${student.Total}</td>
+                <td>${student.Average}</td>
+                <td class="${student.Status === 'Pass' ? 'pass' : 'fail'}">
+                    ${student.Status}
+                </td>
+            </tr>
+        `;
+
+        tbody.innerHTML += row;
+    });
+
+    const mean = (classTotal / processedData.length).toFixed(2);
+
+    document.getElementById('classMean').innerHTML =
+        `Class Mean Average: ${mean}%`;
+}
+
+function downloadResult() {
+    if (processedData.length === 0) {
+        alert('No processed result available.');
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(processedData);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+
+    XLSX.writeFile(workbook, 'Student_Results.xlsx');
+}
+</script>
+
+</body>
+</html>
